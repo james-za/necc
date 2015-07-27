@@ -5,7 +5,8 @@ import java.text.NumberFormat
 import com.ojcoleman.ahni.nn.BainNN
 import jfxtras.labs.scene.control.BigDecimalField
 import necc.JBox2DUtil.Vec2
-import necc.experiment.Experiment.{CompleteTask, ExperimentTask, LoadBlocksTask, PlaceBlocksTask}
+import necc.experiment.Task
+import necc.experiment.Task.{Complete, Gathering, Construction}
 import org.jgapcustomised.ChromosomeMaterial
 import sbinary.{DefaultProtocol, Format}
 
@@ -160,23 +161,19 @@ package object gui {
   object RunDataProtocol extends DefaultProtocol {
     import necc.BainNNProtocol._
     import necc.ChromosomeMaterialProtocol._
-    implicit lazy val RunDataFormat: Format[RunData] = asProduct3(RunData.apply)(d => (d.task, d.anns, d.runs))
-    implicit lazy val RunFormat: Format[Run] = asProduct2(Run.apply)(r => (r.run, r.gens))
-    implicit lazy val GenFormat: Format[Gen] = asProduct2(Gen.apply)(g => (g.gen, g.fitness))
-    implicit lazy val ExperimentTaskFormat: Format[ExperimentTask] = wrap[ExperimentTask, Int]({
-      case LoadBlocksTask => 0
-      case PlaceBlocksTask => 1
-      case CompleteTask => 2
+    implicit lazy val RunDataFormat: Format[RunData] = asProduct3(RunData.apply)(d => (d.task, d.cppns, d.data))
+    implicit lazy val ExperimentTaskFormat: Format[Task] = wrap[Task, Int]({
+      case Gathering => 0
+      case Construction => 1
+      case Complete => 2
     }, {
-      case 0 => LoadBlocksTask
-      case 1 => PlaceBlocksTask
-      case 2 => CompleteTask
+      case 0 => Gathering
+      case 1 => Construction
+      case 2 => Complete
     })
   }
 
-  case class RunData(task: ExperimentTask, anns: Set[(ChromosomeMaterial, BainNN)], runs: Array[Run])
-  case class Run(run: Int, gens: Array[Gen])
-  case class Gen(gen: Int, fitness: Double)
+  case class RunData(task: Task, cppns: Set[String], data: Array[Double])
 
   case class Poly(points: Array[Vec2], agents: Int) {
     override def toString: String =

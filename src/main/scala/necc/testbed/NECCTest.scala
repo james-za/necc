@@ -1,13 +1,15 @@
 package necc.testbed
 
 import necc.ann.ANNContext
-import necc.controller.{Controller, RadialLoadBlocks, RadialComplete, RadialPlaceBlocks}
-import necc.experiment.Experiment.{CompleteTask, ExperimentTask, LoadBlocksTask, PlaceBlocksTask}
+import necc.controller.{Radial, Controller}
+import necc.experiment.Task
 import necc.task._
 import org.jbox2d.common.Vec2
-import org.jbox2d.testbed.framework.{TestbedSettings, TestbedTest}
+import org.jbox2d.testbed.framework.TestbedSetting.SettingType
+import org.jbox2d.testbed.framework.{TestbedSetting, TestbedSettings, TestbedTest}
 
-class NECCTest(settings: TaskSettings, et: ExperimentTask, load: ANNContext, place: ANNContext) extends TestbedTest {
+class NECCTest(settings: TaskSettings, et: Task, val controller: Controller) extends TestbedTest {
+
   def end(): Unit = {
     var i = 0
     var list = getWorld.getBodyList
@@ -21,43 +23,36 @@ class NECCTest(settings: TaskSettings, et: ExperimentTask, load: ANNContext, pla
   override def getTestName: String = "NECC Test"
 
   var timeSinceANN = 0f
-  val intervalANN = 1f
+  val intervalANN = settings.intervalRunANN
 
-  var task: Option[Simulation] = None
-  var controller: Option[Controller] = None
+  var simulation: Option[Simulation] = None
 
   override def initTest(deserialized: Boolean): Unit = if (!deserialized) {
+    val hz: Int = (1.0f / settings.intervalStep).toInt
     timeSinceANN = 0f
     getWorld.setGravity(new Vec2(0, 0))
     val world = Some(getWorld)
     val blockLayout = BlockLayout.generate(settings.blockTypes, n = 20, min = 18f, max = 34f)
-    et match {
-      case LoadBlocksTask =>
-        controller = Some(new RadialLoadBlocks(load))
-        task = Some(new GatheringSim(settings, world, blockLayout))
-      case PlaceBlocksTask =>
-        controller = Some(new RadialPlaceBlocks(place))
-        task = Some(new ConstructionSim(settings, world, blockLayout))
-      case CompleteTask =>
-        controller = Some(new RadialComplete(load, place))
-        task = Some(new Complete(settings, world, blockLayout))
-    }
 
-    for (t <- task; c <- controller) c.run(t)
+    simulation = Some(et.simulation(settings, blockLayout, world))
+
+    //for (t <- simulation) controller.run(t)
   }
 
-  override def step(settings: TestbedSettings): Unit = {
-    super.step(settings)
+  override def step(testbedSettings: TestbedSettings): Unit = {
+    super.step(testbedSettings)
 
-    for (t <- task; c <- controller) {
-      val dt = 1.0f / settings.getSetting("Hz").value
+    for (t <- simulation) {
+      val dt = settings.intervalStep
       t.step(dt)
 
       if (timeSinceANN > intervalANN) {
-        c.run(t)
+        controller.run(t)
         timeSinceANN -= intervalANN
       }
       timeSinceANN += dt
+
+      //println(f"$dt%5.5f | $timeSinceANN%5.5f")
     }
   }
 }

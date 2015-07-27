@@ -11,11 +11,11 @@ import org.jbox2d.dynamics.contacts.Contact
 
 import scala.util.Random
 
-class Complete(
+class CompleteSim(
   val settings: TaskSettings,
   externalWorld: Option[World] = None,
   val blockLayout: Vector[(Vec2, Block.Type)]
-) extends Simulation with Gathering with Construction with HasTaskSettings {
+) extends Simulation with Gathering with Construction {
   def getWorld = {
     for (w <- externalWorld) w.setGravity(Vec2.zero)
     externalWorld.getOrElse(new World(Vec2(0, 0)))

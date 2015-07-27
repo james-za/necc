@@ -2,24 +2,14 @@ package necc.hyperneat
 
 import com.ojcoleman.ahni.util.Point
 import RadialFF._
+import necc.experiment.Task
 
-trait RadialFF extends NECCFitnessFunction {
-  override def getNeuronPositions(layer: Int, totalLayerCount: Int): Array[Point] = {
-    //println("getting neuron positions")
-    layer match {
-      case 0 => layerInput(settings.sensors)
-      case 2 => layerOutput
-      case _ => layerHidden(settings.sensors)
-    }
-  }
-
-  override def getLayerDimensions(layer: Int, totalLayerCount: Int): Array[Int] = {
-    //println("getting layer dimensions")
-    layer match {
-      case 2 => Array(1, 2)
-      case _ => Array(1, settings.sensors)
-    }
-  }
+class RadialFF(task: Task) extends NECCFitnessFunction(task) {
+//  override def getNeuronPositions(layer: Int, totalLayerCount: Int): Array[Point] =
+//    neuronPositions(sensorCount, layer)
+//
+//  override def getLayerDimensions(layer: Int, totalLayerCount: Int): Array[Int] =
+//    layerDimensions(sensorCount, layer)
 }
 
 object RadialFF {
@@ -27,6 +17,23 @@ object RadialFF {
   val midY = 0.5
   val radius = 0.5
   val facing = math.Pi / 2.0
+
+  def neuronPositions(sensors: Int, layer: Int): Array[Point] = {
+    //println("getting neuron positions")
+    layer match {
+      case 0 => layerInput(sensors)
+      case 2 => layerOutput
+      case _ => layerHidden(sensors)
+    }
+  }
+
+  def layerDimensions(sensors: Int, layer: Int): Array[Int] = {
+    //println("getting layer dimensions")
+    layer match {
+      case 2 => Array(1, 2)
+      case _ => Array(1, sensors)
+    }
+  }
 
   // radial inputs
   def layerInput(n: Int) = {

@@ -264,13 +264,13 @@ class BlockPreview extends VBox {
   }
   
   minWidth <== prefWidth
-  content = Seq(
+  children = Seq(
     Label("Block Types:"),
     blockTypePane,
     "Decimal Precision:" @: decimalPrecision,
     "Number of Agents:" @: blockAgents,
-    new HBox { content = Seq(Spacer(), blockPreviewCanvas, Spacer())},
-    new HBox(5) { content = Seq(Spacer(), copyBlockType, removeBlockType, Spacer())}
+    new HBox { children = Seq(Spacer(), blockPreviewCanvas, Spacer())},
+    new HBox(5) { children = Seq(Spacer(), copyBlockType, removeBlockType, Spacer())}
   )
   blockAgents.property.onInvalidate(_ => {
     val poly = blockTypePane.selectionModel().getSelectedItem

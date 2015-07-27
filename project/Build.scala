@@ -91,20 +91,21 @@ object BuildSettings {
   lazy val paradiseVersion = "2.0.1"
   lazy val buildSettings = Defaults.coreDefaultSettings ++ Seq(
     organization := "za.jwatson",
-    version := "1.4.3",
+    version := "1.6.0",
     scalacOptions ++= Seq("-deprecation", "-optimise"),
-    scalaVersion := "2.11.4",
+    scalaVersion := "2.11.6",
     resolvers += Resolver.sonatypeRepo("snapshots"),
     resolvers += Resolver.sonatypeRepo("releases"),
     libraryDependencies ++= Seq(
       "org.jbox2d" % "jbox2d-library" % "2.2.1.1",
       "org.jbox2d" % "jbox2d-testbed" % "2.2.1.1",
-      "org.scala-tools.sbinary" %% "sbinary" % "0.4.3-SNAPSHOT" cross CrossVersion.full,
-      "org.scalafx" %% "scalafx" % "2.2.67-R10",
-      "com.typesafe.akka" %% "akka-actor" % "2.3.6",
-      "com.github.nscala-time" %% "nscala-time" % "1.4.0",
-      "org.jfxtras" % "jfxtras-labs" % "2.2-r5",
-      "com.github.tototoshi" %% "scala-csv" % "1.1.2"
+      "org.scala-tools.sbinary" %% "sbinary" % "0.4.3-1",
+      "org.scalafx" %% "scalafx" % "2.2.76-R11",
+      "com.typesafe.akka" %% "akka-actor" % "2.3.11",
+      "com.github.nscala-time" %% "nscala-time" % "2.0.0",
+      "org.jfxtras" % "jfxtras-labs" % "2.2-r6-SNAPSHOT",
+      "com.github.tototoshi" %% "scala-csv" % "1.2.1",
+      "com.jsuereth" %% "scala-arm" % "2.0.0-M1"
     ),
     // dependencies of ahni
     libraryDependencies ++= Seq(
@@ -119,7 +120,8 @@ object BuildSettings {
       "-source", "1.7",
       "-Xlint:deprecation"),
     fork := true,
-    unmanagedResourceDirectories in Compile += baseDirectory.value / "zipresources"
+    unmanagedResourceDirectories in Compile += baseDirectory.value / "zipresources",
+    unmanagedJars in Compile += Attributed.blank(file(scala.util.Properties.javaHome) / "/lib/jfxrt.jar")
   )
 }
 

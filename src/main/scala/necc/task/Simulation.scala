@@ -12,7 +12,8 @@ import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
 import scala.util.Random
 
-trait Simulation { this: HasTaskSettings =>
+trait Simulation {
+  val settings: TaskSettings
   val id = { Simulation.nextId += 1; Simulation.nextId }
   var alreadyRun: Boolean = false
   var fitness = 0.0

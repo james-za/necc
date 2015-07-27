@@ -4,18 +4,12 @@ import com.ojcoleman.ahni.hyperneat.Properties
 import necc.gui.BlockPreview
 import necc.simulation.Block
 
-trait HasTaskSettings { this: Simulation =>
-  val settings: TaskSettings
-}
-
 case class TaskSettings(
-  intervalStep: Float = 1f / 30f,
-  intervalRunANN: Float = 1f,
-  maxTime: Float = 180,
-  blockTypes: Seq[Block.Type] = Seq(Block.TypeA, Block.TypeB),
+  intervalStep: Float = 1f / 15f,
+  intervalRunANN: Float = 0.2f,
+  maxTime: Float = 240,
+  blockTypes: Seq[Block.Type] = Seq(Block.TypeA, Block.TypeB)
   //todo: blockLayout: Seq[Vec2]
-  sensors: Int = 8,
-  sensorRange: Double = 50.0
 ) {
   assert(intervalStep < intervalRunANN)
 
@@ -31,15 +25,13 @@ object TaskSettings {
       bt <- props.getProperty("evaluate.blocks.types", "").split("\\|").toSeq
       poly <- BlockPreview.parsePolygon(bt)
     } yield Block.TypeCustom(poly)
-    val sc = props.getIntProperty("evaluate.sensors.count", defaults.sensors)
-    val sr = props.getDoubleProperty("evaluate.sensors.range", defaults.sensorRange)
+//    val sc = props.getIntProperty("evaluate.sensors.count", defaults.sensors)
+//    val sr = props.getDoubleProperty("evaluate.sensors.range", defaults.sensorRange)
     TaskSettings(
       intervalStep = s,
       intervalRunANN = c,
       maxTime = t,
-      blockTypes = bts,
-      sensors = sc,
-      sensorRange = sr
+      blockTypes = bts
     )
   }
 }

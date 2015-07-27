@@ -3,7 +3,7 @@ package necc.ann
 import org.jbox2d.dynamics.World
 import necc.simulation.{Block, Structure, Agent}
 
-class TestANNContext extends ANNContext {
+class TestANNContext(val inputCount: Int, val outputCount: Int = 2, val sensorRange: Double = 50.0) extends ANNContext {
   /** v ∈ [0, 3) */
   def linearVelocity: Double = math.random * 3
 
@@ -13,11 +13,8 @@ class TestANNContext extends ANNContext {
     if (a < 0) (-1.5) - a else a + 1
   }
 
-  override def reset(): Unit = {}
+  override def reset(): Unit = ()
 
   override def apply(inputs: Array[Double]): Array[Double] =
     Array(linearVelocity, angularVelocity)
-
-  override def apply(inputs: Array[Array[Double]]): Array[Array[Double]] =
-    Array(Array(linearVelocity), Array(angularVelocity))
 }

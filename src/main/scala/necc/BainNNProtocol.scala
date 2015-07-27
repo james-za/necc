@@ -6,7 +6,7 @@ import com.ojcoleman.ahni.nn.BainNN.Topology
 import com.ojcoleman.ahni.util.Point
 import com.ojcoleman.bain.NeuralNetwork
 import com.ojcoleman.bain.base._
-import com.ojcoleman.bain.neuron.rate.ClampedLinearNeuronCollection
+import com.ojcoleman.bain.neuron.rate.{SigmoidNeuronConfiguration, SigmoidNeuronCollection, ClampedLinearNeuronCollection}
 import com.ojcoleman.bain.synapse.rate.FixedSynapseCollection
 import sbinary.{DefaultProtocol, Format}
 
@@ -82,10 +82,31 @@ object BainNNProtocol extends DefaultProtocol {
       (size, bias, c.getSpikings, configs, ccIndices)
   }
 
+  implicit lazy val SigmoidNeuronCollectionFormat: Format[SigmoidNeuronCollection] = asProduct5 {
+    (size: Int, bias: Array[Double], spikings: Array[Boolean],
+     configs: Array[SigmoidNeuronConfiguration], ccIndices: Array[Int]) =>
+      val c = new SigmoidNeuronCollection(size)
+      bias.zipWithIndex.foreach { case (v, i) => c.setBias(i, v) }
+      spikings.zipWithIndex.foreach { case (s, i) => if (s) c.spiked(i) }
+      configs.foreach(c.addConfiguration(_))
+      ccIndices.zipWithIndex.foreach { case (cc, i) => c.setComponentConfiguration(i, cc) }
+      c.init()
+      c
+  } {
+    c =>
+      val size = c.getSize
+      val bias = (0 until size).map(c.getBias).toArray
+      val configs = (0 until c.getConfigurationCount).map(c.getConfiguration).toArray
+      val ccIndices = (0 until size).map(c.getComponentConfigurationIndex).toArray
+      (size, bias, c.getSpikings, configs, ccIndices)
+  }
+
   implicit lazy val NeuronCollectionFormat: Format[NeuronCollection[_ <: NeuronConfiguration]] = asUnion(
-    ClampedLinearNeuronCollectionFormat)
+    ClampedLinearNeuronCollectionFormat, SigmoidNeuronCollectionFormat)
 
   implicit lazy val NeuronConfigurationFormat: Format[NeuronConfiguration] = asUnion()
+  implicit lazy val SigmoidNeuronConfigurationFormat: Format[SigmoidNeuronConfiguration] =
+    wrap[SigmoidNeuronConfiguration, Double](_.slope, new SigmoidNeuronConfiguration(_))
 
   implicit lazy val FixedSynapseCollectionFormat: Format[FixedSynapseCollection] = asProduct6 {
     (size: Int, weights: Array[Double], preIndices: Array[Int], postIndices: Array[Int],

@@ -6,5 +6,7 @@ import necc.simulation.{Structure, Block, Agent}
 trait ANNContext {
   def reset(): Unit
   def apply(inputs: Array[Double]): Array[Double]
-  def apply(inputs: Array[Array[Double]]): Array[Array[Double]]
+  def inputCount: Int
+  def outputCount: Int
+  def sensorRange: Double
 }

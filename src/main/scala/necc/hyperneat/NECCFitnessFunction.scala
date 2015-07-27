@@ -1,24 +1,31 @@
 package necc.hyperneat
 
+import java.util
 import java.util.concurrent.TimeUnit
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef}
 import akka.util.Timeout
-import com.anji.integration.Activator
+import com.anji.integration.{Transcriber, Activator}
 import com.ojcoleman.ahni.evaluation.BulkFitnessFunctionMT
 import com.ojcoleman.ahni.hyperneat.Properties
 import com.ojcoleman.ahni.nn.BainNN
-import necc.JBox2DUtil.Vec2
-import necc.ann.{ANNContext, BainNNContext}
-import necc.experiment.Experiment
+import necc.NECCRunner.NamedDoubleAllele
+import necc.ann.ActivatorContext
+import necc.controller.Controller
+import necc.experiment.Task
+import necc.experiment.Task.{Complete, Construction, Gathering}
 import necc.hyperneat.NECCFitnessFunction._
-import necc.simulation.Block
 import necc.task._
-import org.jbox2d.common.MathUtils
-import org.jgapcustomised.{ChromosomeMaterial, Chromosome}
+import necc.Morphology
+import org.jgapcustomised.{Chromosome, ChromosomeMaterial}
 
-import scala.concurrent.Await
+import scala.annotation.tailrec
+import scala.concurrent.{ExecutionContext, Future, Await}
 import scala.concurrent.duration.Duration
+
+import collection.JavaConverters._
+
+import necc.ChromosomeOps
 
 object NECCFitnessFunction {
   case class Evaluation(genotype: ChromosomeMaterial, ann: BainNN, fitness: Double)
@@ -47,22 +54,60 @@ object NECCFitnessFunction {
 }
 
 
-trait NECCFitnessFunction extends BulkFitnessFunctionMT {
+class NECCFitnessFunction(val task: Task) extends BulkFitnessFunctionMT {
   var rep = defaultRep
   var settings = TaskSettings.defaults
-  val layers = Seq(0, 1, 2)
-  var evalCollector: Option[ActorRef] = None
-  implicit val timeout = Timeout(Duration(30, TimeUnit.SECONDS))
 
   override def init(props: Properties): Unit = {
-    rep = props.getIntProperty("evaluate.averaging.repetitions", defaultRep)
+    rep = props.getIntProperty("evaluate.repetitions", defaultRep)
     settings = TaskSettings.fromProps(props)
-    val (layerWidths, layerHeights) = layers.map(getLayerDimensions(_, 3)).map(d => (d(0), d(1))).unzip
-    props.setProperty("ann.hyperneat.width", layerWidths.mkString(", "))
-    props.setProperty("ann.hyperneat.height", layerHeights.mkString(", "))
-    val futureRef = necc.actorSystem.actorSelection(props.getProperty("collector.path")).resolveOne()
-    evalCollector = Some(Await.result(futureRef, timeout.duration))
+
     super.init(props)
+  }
+
+  override def evaluate(genotypes: util.List[Chromosome]): Unit = {
+    if (transcriber != null && lastBestChrom != null && props.getBooleanProperty(Morphology.TopologicalConnectivityKey)) {
+      // After evaluating all genotypes, test best performing on all morphologies and apply best
+      // morphology to whole population. todo: One per species instead of population?
+
+      println(s"getting best sensor count for ${genotypes.size()} chromosome(s)")
+
+      val (morphologyResults, sum) = findBestMorphology(transcriber, lastBestChrom)
+
+      for {
+        g <- genotypes.asScala
+        d <- g.sensorCount
+      } d.value = pickWeighted(morphologyResults, sum).toDouble
+    }
+
+    super.evaluate(genotypes)
+  }
+
+  @tailrec private def pickWeighted[A](from: IndexedSeq[(A, Double)], sum: Double, at: Int = 0): A = {
+    from.head match {
+      case (x, p) =>
+        if (at < from.length - 1) x
+        else if (p / sum < random.nextDouble()) x
+        else pickWeighted(from, sum - p, at + 1)
+    }
+  }
+
+  def findBestMorphology(transcriber: Transcriber[_ <: Activator], from: Chromosome): (IndexedSeq[(Int, Double)], Double) = {
+    val morphologies = for (s <- 3 to 16) yield s
+    val chromosomes = for (m <- morphologies) yield {
+      val chromosome = new Chromosome(from.cloneMaterial(), 0L, 0, 0)
+      for (d <- chromosome.sensorCount) d.value = m
+      chromosome
+    }
+
+    import ExecutionContext.Implicits.global
+    val future = Future.traverse(chromosomes)(c => Future {
+      val substrate = transcriber.transcribe(c)
+      try evaluate(c, substrate, -1) finally substrate.dispose()
+    })
+    val result = Await.result(future, Duration.Inf)
+//    for ((s, f) <- morphologies zip result) println(s"chromosome with $s sensors: fitness = $f")
+    (morphologies zip result, result.sum)
   }
 
   override def initialiseEvaluation(): Unit = {}
@@ -72,15 +117,22 @@ trait NECCFitnessFunction extends BulkFitnessFunctionMT {
   override def evaluate(genotype: Chromosome, substrate: Activator, evalThreadIndex: Int): Double = {
     substrate match {
       case ann: BainNN =>
-        val annContext = new BainNNContext(ann)
+        //assert(genotype.sensorCount.exists(d => math.round(d.value).toInt == ann.getInputCount))
+        val sensorRange = genotype.sensorRange.fold(50.0)(_.value)
+        val annContext = new ActivatorContext(ann, sensorRange)
+        val controller = task match {
+          case Gathering => new Controller.Gathering(annContext)
+          case Construction => new Controller.Construction(annContext)
+          case Complete => new Controller.Complete(annContext, annContext)
+        }
         val blockLayout = BlockLayout.generate(settings.blockTypes, n = 20, min = 18f, max = 34f)
         var i = 0
         var fitness: Double = 0.0
         while (i < rep) {
           if (i > 0) annContext.reset()
-          val runFitness = experiment.evaluate(settings, annContext, blockLayout)
+          val runFitness = task.evaluate(settings, controller, blockLayout)
           fitness += runFitness
-          //println(s"evaluation #$e-$i: runFitness = $runFitness, fitness = $fitness")
+//          println(s"evaluation #${genotype.getId}-$i: runFitness = $runFitness, fitness = $fitness")
           i += 1
         }
         fitness = (fitness / rep.toDouble) max 0.0 min 1.0
@@ -89,7 +141,7 @@ trait NECCFitnessFunction extends BulkFitnessFunctionMT {
 
         e += 1
 
-        for (ec <- evalCollector) ec ! Evaluation(genotype.cloneMaterial(), ann, fitness)
+//        for (ec <- evalCollector) ec ! Evaluation(genotype.cloneMaterial(), ann, fitness)
 
         fitness
       case _ =>
@@ -97,8 +149,6 @@ trait NECCFitnessFunction extends BulkFitnessFunctionMT {
         0
     }
   }
-
-  def experiment: Experiment
 }
 
 
